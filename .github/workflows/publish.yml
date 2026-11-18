@@ -1,0 +1,28 @@
+# Lädt die Dateien aus upload/ ins Release "latest" hoch (öffentliches Repo: kostenlose Actions-Minuten).
+name: Update veröffentlichen
+on:
+  push:
+    branches: [main]
+    paths: ["upload/**"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prüfsumme kontrollieren
+        run: |
+          want=$(jq -r .sha256 upload/latest.json)
+          have=$(sha256sum upload/Belegwerk-Setup.exe | cut -d' ' -f1)
+          echo "latest.json: $want"; echo "Installer:   $have"
+          test "$want" = "$have"
+      - name: Ins Release "latest" hochladen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "Belegwerk (aktuell)" --notes "Aktuelle Version von Belegwerk."
+          gh release upload latest upload/Belegwerk-Setup.exe upload/latest.json --clobber
+          gh release view latest --json assets --jq '.assets[] | "\(.name) \(.size)"'
