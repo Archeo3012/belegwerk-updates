@@ -3,7 +3,7 @@ name: Update veröffentlichen
 on:
   push:
     branches: [main]
-    paths: ["upload/**"]
+    paths: ["upload/**", ".github/workflows/publish.yml"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -23,6 +23,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view latest >/dev/null 2>&1 || gh release create latest --title "Belegwerk (aktuell)" --notes "Aktuelle Version von Belegwerk."
-          gh release upload latest upload/Belegwerk-Setup.exe upload/latest.json --clobber
-          gh release view latest --json assets --jq '.assets[] | "\(.name) \(.size)"'
+          v=$(jq -r .version upload/latest.json)
+          notes=$(jq -r '.notes // ""' upload/latest.json)
+          # Release neu anlegen, damit Datum und Titel die aktuelle Version zeigen.
+          # Die Download-Adressen bleiben gleich (Tag "latest").
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest upload/Belegwerk-Setup.exe upload/latest.json \
+            --title "Belegwerk $v" --notes "Version $v. $notes" --target main
+          gh release view latest --json tagName,name,publishedAt,assets --jq '"\(.name) \(.publishedAt)", (.assets[] | "\(.name) \(.size)")'
